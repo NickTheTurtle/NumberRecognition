@@ -1,1 +1,4 @@
 # NumberRecognition
+See website on https://nicktheturtle.github.io/NumberRecognition/
+
+The algorithm is based on a trained neural network. This is still a work-in-progress, so the accuracy isn't that high yet (and I am too lazy to add styling).
