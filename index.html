@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Handwriting Recognition</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="numbo.js"></script>
+  </head>
+  <body>
+    <canvas id="drawingPad" height="280" width="280"></canvas>
+    <canvas id="displayPad" height="280" width="280"></canvas>
+    <div>
+      <button id="clear">Clear</button>
+      <button id="recognize">Recognize</button>
+    </div>
+    <ul id="result">
+    </ul>
+    <script>
+    let canvas = document.getElementById("drawingPad"),
+        context = canvas.getContext("2d"),
+        displayPad = document.getElementById("displayPad"),
+        displayContext = displayPad.getContext("2d"),
+        prevCoord = false,
+        startDrawing = (e) => {
+          e.preventDefault();
+          canvas.addEventListener("mousemove", draw, false);
+          return;
+        },
+        startDrawingTouch = (e) => {
+          e.preventDefault();
+          canvas.addEventListener("touchmove", drawTouch, false);
+          return;
+        },
+        draw = (e) => {
+          e.preventDefault();
+          let radius = 15,
+              rect = canvas.getBoundingClientRect();
+          context.strokeStyle = "black";
+          context.lineWidth = radius * 2;
+          context.lineJoin = "round";
+          context.lineCap = "round";
+          if (prevCoord) {
+            context.beginPath();
+            context.moveTo(...prevCoord)
+            context.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            context.closePath();
+            context.stroke();
+          }
+          prevCoord = [e.clientX - rect.left, e.clientY - rect.top];
+          return;
+        },
+        drawTouch = (e) => {
+          e.preventDefault();
+          let radius = 15;
+          context.strokeStyle = "black";
+          context.lineWidth = radius * 2;
+          context.lineJoin = "round";
+          context.lineCap = "round";
+          if (prevCoord) {
+            context.beginPath();
+            context.moveTo(...prevCoord)
+            context.lineTo(e.touches[0].pageX, e.touches[0].pageY);
+            context.closePath();
+            context.stroke();
+          }
+          prevCoord = [e.touches[0].pageX, e.touches[0].pageY];
+          return;
+        },
+        endDrawing = (e) => {
+          e.preventDefault();
+          prevCoord = false;
+          canvas.removeEventListener("mousemove", draw, false);
+          return;
+        },
+        endDrawingTouch = (e) => {
+          e.preventDefault();
+          prevCoord = false;
+          canvas.removeEventListener("touchmove", drawTouch, false);
+          return;
+        },
+        trainingData = [];
+    canvas.addEventListener("mousedown", startDrawing, false);
+    canvas.addEventListener("mouseup", endDrawing, false);
+    canvas.addEventListener("mouseleave", endDrawing, false);
+
+    canvas.addEventListener("touchstart", startDrawingTouch, false);
+    canvas.addEventListener("touchend", endDrawingTouch, false);
+
+    document.getElementById("clear").addEventListener("click", function() {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      displayContext.clearRect(0, 0, canvas.width, canvas.height);
+    }, false);
+
+    document.getElementById("recognize").addEventListener("click", function() {
+      displayContext.clearRect(0, 0, canvas.width, canvas.height);
+      let data = context.getImageData(0, 0, canvas.width, canvas.height).data,
+          num = [],
+          center = [0, 0],
+          n = 0,
+          bounding = [[canvas.width, canvas.height], [-1, -1]];
+      for (let i = 0; i < canvas.height; ++i) {
+        for (let j = 0; j < canvas.width; ++j) {
+          let color = data[4 * (canvas.width * i + j) + 3];
+          if (color > 9) {
+            center[0] += j * color / 255;
+            center[1] += i * color / 255;
+            n += color / 255;
+            bounding[0][0] = Math.min(j, bounding[0][0]);
+            bounding[0][1] = Math.min(i, bounding[0][1]);
+            bounding[1][0] = Math.max(j, bounding[1][0]);
+            bounding[1][1] = Math.max(i, bounding[1][1]);
+          }
+        }
+      }
+      center[0] = Math.round(center[0] / n);
+      center[1] = Math.round(center[1] / n);
+
+      // Center image at center, bound by bounding
+      let side = 40 * Math.round(Math.max(center[0] - bounding[0][0], bounding[0][1] - center[0], center[1] - bounding[1][0], bounding[1][1] - center[1]) / 20);
+
+      let pixelWidth = side / 20,
+          pixelHeight = side / 20;
+      num.push(...Array(116).fill(0));
+      for (let i = center[1] - side / 2; i < center[1] + side / 2; i += pixelHeight) {
+        for (let j = center[0] - side / 2; j < center[0] + side / 2; j += pixelWidth) {
+          let r = 0;
+          for (let k = i; k < i + pixelHeight; ++k) {
+            for (let l = j; l < j + pixelWidth; ++l) {
+              r += data[4 * (canvas.width * k + l) + 3] || 0;
+            }
+          }
+          num.push(r / pixelWidth / pixelHeight);
+        }
+        num.push(...Array(8).fill(0));
+      }
+      num.push(...Array(108).fill(0));
+
+      let s = "",
+          result = [];
+      for (let i = 0; i < 10; ++i) {
+        result.push([i, ...recognize[i](num)]);
+      }
+      result = result.sort((a, b) => b[1] - a[1]);
+      for (let i = 0; i < result.length; ++i) {
+        s += `<li>Confidence of being ${result[i][0]}: ${Math.round(result[i][1] * 10000) / 100}%</li>`;
+      }
+      document.getElementById("result").innerHTML = s;
+
+      for (let i = 0; i < num.length; ++i) {
+        if (num[i]) {
+          displayContext.fillStyle = `rgba(0,0,0,${num[i]})`;
+          displayContext.fillRect((i % 28) * canvas.width / 28, Math.floor(i / 28) * canvas.height / 28, canvas.width / 28, canvas.height / 28);
+        }
+      }
+    }, false);
+    </script>
+  </body>
+</html>
