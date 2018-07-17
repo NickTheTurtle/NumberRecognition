@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Handwriting Recognition</title>
     <link rel="stylesheet" href="style.css" />
-    <script defer src="numbojumbo.js"></script>
+    <script defer src="numbers.js"></script>
   </head>
   <body>
     <canvas id="drawingPad" height="280" width="280"></canvas>
@@ -120,27 +120,22 @@
 
       let pixelWidth = side / 20,
           pixelHeight = side / 20;
-      num.push(...Array(116).fill(0));
+      num.push(...Array(116).fill(-1));
       for (let i = center[1] - side / 2; i < center[1] + side / 2; i += pixelHeight) {
         for (let j = center[0] - side / 2; j < center[0] + side / 2; j += pixelWidth) {
           let r = 0;
           for (let k = i; k < i + pixelHeight; ++k) {
             for (let l = j; l < j + pixelWidth; ++l) {
-              r += data[4 * (canvas.width * k + l) + 3] || 0;
+              r += ((data[4 * (canvas.width * k + l) + 3] || 0) - 127.5) / 127.5;
             }
           }
           num.push(r / pixelWidth / pixelHeight);
         }
-        num.push(...Array(8).fill(0));
+        num.push(...Array(8).fill(-1));
       }
-      num.push(...Array(108).fill(0));
-
+      num.push(...Array(108).fill(-1));
       let s = "",
-          result = [];
-      for (let i = 0; i < 10; ++i) {
-        result.push([i, ...recognize[i](num)]);
-      }
-      result = result.sort((a, b) => b[1] - a[1]);
+          result = recognize(num).map((a, i) => [i, a]).sort((a, b) => b[1] - a[1]);
       for (let i = 0; i < result.length; ++i) {
         s += `<li>Confidence of being ${result[i][0]}: ${Math.round(result[i][1] * 10000) / 100}%</li>`;
       }
@@ -148,7 +143,7 @@
 
       for (let i = 0; i < num.length; ++i) {
         if (num[i]) {
-          displayContext.fillStyle = `rgba(0,0,0,${num[i]})`;
+          displayContext.fillStyle = `rgba(0,0,0,${(num[i] + 1) * 127.5})`;
           displayContext.fillRect((i % 28) * canvas.width / 28, Math.floor(i / 28) * canvas.height / 28, canvas.width / 28, canvas.height / 28);
         }
       }
